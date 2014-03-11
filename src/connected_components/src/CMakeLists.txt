@@ -1,0 +1,1 @@
+ADD_LIBRARY(connected_components OBJECT connected_components.c connected_components_boost_wrapper.cpp)
