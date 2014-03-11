@@ -1,58 +1,88 @@
 /*
  * Connected components algorithm for PostgreSQL
  *
- * Copyright (c) 2014 Adrien André
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ * Copyright (c) 2014 Adrien ANDRÉ
  *
  */
-#include <iostream>
+#include "connected_components.h"
+#include <cfloat>
+
 #include <vector>
 #include <algorithm>
 #include <utility>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 
 using namespace std;
 using namespace boost;
 
-/*
- * pgr_dijkstra('SELECT id, source, target, cost FROM network ;', 172, 253, FALSE, FALSE)
- *
- */
 
-int main(int , char* [])
+/* Structure storing a vertex. */
+struct Vertex
 {
-  {
-    typedef adjacency_list <vecS, vecS, undirectedS> Graph;
+    int id;
+};
 
-    Graph G;
-    add_edge(0, 1, G);
-    add_edge(1, 4, G);
-    add_edge(4, 0, G);
-    add_edge(2, 5, G);
 
-    std::vector<int> component(num_vertices(G));
-    // calling Boost function
-    int component_count = connected_components(G, &component[0]);
+/* Adds an edge to the graph.
+ *
+ * Edge id, source and target ids and coordinates are copied also. */
+template <class G, class E>
+static void
+graph_add_edge(G &graph, E &e,
+               int id, int source, int target)
+{
+  bool inserted;
 
-    std::vector<int>::size_type i;
-    cout << "Total number of components: " << component_count << endl;
-    for (i = 0; i != component.size(); ++i)
-      cout << "Vertex " << i <<" is in component " << component[i] << endl;
-    cout << endl;
+  tie(e, inserted) = add_edge(source, target, graph);
+
+  graph[e].id = id;
+
+  typedef typename graph_traits<G>::vertex_descriptor Vertex;
+  Vertex s = vertex(source, graph);
+  Vertex t = vertex(target, graph);
+}
+
+
+/* Computes connected components.
+ * 
+ * Builds boost graph from egde list,
+ * calls the boost connected components function and
+ * returns a component id vector:
+ * component[vertex_id] = component_id
+ *
+ * edges: the edge list,
+ * count: the edge number,
+ * component_count: the component number */
+int
+boost_connected_components(edge_t *edges, unsigned int count,
+                           int *component_count,
+			   char **err_msg)
+{
+  try {
+    {
+      typedef adjacency_list <vecS, vecS, undirectedS, no_property, Vertex> graph_t;
+      typedef graph_traits <graph_t>::edge_descriptor edge_descriptor;
+
+      /* Build boost graph from edge list. */    
+      graph_t graph;
+      for (size_t j = 0; j < count; ++j)
+      {
+	edge_descriptor e;
+	graph_add_edge<graph_t, edge_descriptor>(graph, e,
+	    edges[j].id, edges[j].source, edges[j].target);
+      }
+    
+      vector<int> component(num_vertices(graph));
+      // calling Boost function
+      *component_count = connected_components(graph, &component[0]);
+
+      // TODO: prepare component vector for output
+    }
+    return EXIT_SUCCESS;
+  } catch(...) {
+    *err_msg = (char *) "Unknown exception caught!";
+    return -1;
   }
-  return 0;
 }
